@@ -292,9 +292,9 @@ def make_circle(image_path, size):
 
 # ================== JANELA ==================
 
-customtkinter.set_appearance_mode("dark")
+customtkinter.set_appearance_mode("light")
 app = customtkinter.CTk()
-app.title("Sistema de Gestão de Artesanato")
+app.title("Reajuste Comercialização")
 app.after(0, lambda: app.state('zoomed'))
 
 frame_artesao = customtkinter.CTkFrame(app, fg_color="#2b2b2b", corner_radius=15)
