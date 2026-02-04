@@ -51,5 +51,5 @@ baixar_e_substituir()
 time.sleep(1)
 
 # reinicia o programa principal
-subprocess.Popen([sys.executable, os.path.join(BASE_DIR, "ctk.py")])
+subprocess.Popen([sys.executable, os.path.join(BASE_DIR, "main.py")])
 sys.exit()
