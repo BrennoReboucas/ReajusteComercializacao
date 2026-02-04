@@ -9,38 +9,23 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from datetime import datetime
 
-BASE_ATT = os.path.dirname(os.path.abspath(__file__))
-VERSAO_LOCAL = None
+# ================== 🔥 SISTEMA DE CAMINHOS (CORREÇÃO EXE) ==================
+def resource_path(relative_path):
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
-# lê a versão local
-version_file = os.path.join(BASE_ATT, "version.txt")
-if os.path.exists(version_file):
-    with open(version_file, "r") as f:
-        VERSAO_LOCAL = f.read().strip()
+# pasta onde o exe está (para salvar PDF etc)
+APP_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-# URL do version.txt no GitHub (raw)
-URL_VERSION = "https://raw.githubusercontent.com/BrennoReboucas/ReajusteComercializacao/main/version.txt"
-
-try:
-    r = requests.get(URL_VERSION, timeout=5)
-    if r.status_code == 200:
-        versao_remota = r.text.strip()
-        if versao_remota != VERSAO_LOCAL:
-            # abre o updater.py e fecha o programa principal
-            subprocess.Popen([sys.executable, os.path.join(BASE_ATT, "updater.py")])
-            sys.exit()
-except Exception as e:
-    print("Erro ao verificar atualização:", e)
-
-
-linhas_produtos = []
-
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-caminho_json = os.path.join(BASE_DIR, "auth", "link.json")
-
+# ================== ARQUIVOS ==================
+caminho_json = resource_path("auth/link.json")
 with open(caminho_json, "r", encoding="utf-8") as f:
     link = json.load(f)
+
+linhas_produtos = []
 
 # ================== LOADING ==================
 
@@ -175,7 +160,36 @@ def info_produto(codigo, e_desc, id):
 
     response = requests.post(url=url, json=payload, headers=header)
     data = response.json()
+    id_produto = data['response'][0]['id']
+    info_reajuste(id_produto)
     atualizar_entry(data, e_desc)
+
+def info_reajuste(id):
+    token_api.capturar_token()
+    token = token_api.carregar_token()
+    header = {"Authorization": token}
+
+    url = link["comercializacaoReajuste"] + str(id)
+
+    try:
+        response = requests.get(url=url, headers=header)
+        data = response.json()
+
+        # Se não existir reajuste
+        if not data.get("response") or not data["response"].get("dataReajuste"):
+            l_reajuste.configure(text="Nunca Reajustado")
+            return
+
+        ultimo_reajuste = data["response"]["dataReajuste"][:10]  # yyyy-mm-dd
+        dia = ultimo_reajuste[8:]
+        mes = ultimo_reajuste[5:7]
+        ano = ultimo_reajuste[:4]
+
+        l_reajuste.configure(text=f"{dia}/{mes}/{ano}")
+
+    except Exception as e:
+        print("Erro ao buscar reajuste:", e)
+        l_reajuste.configure(text="Nunca Reajustado")
 
 
 def atualizar_entry(data, e_desc):
@@ -193,19 +207,29 @@ def atualizar_entry(data, e_desc):
 # ================== UI LINHA PRODUTO ==================
 
 def adicionar_linha():
-    global e_cod, e_desc, e_val, e_reaj
+    global e_cod, e_desc, e_val, e_reaj, l_reajuste
+
     linha_frame = customtkinter.CTkFrame(frame_produtos, fg_color="transparent")
     linha_frame.pack(fill="x", padx=10, pady=5)
 
-    linha_frame.grid_columnconfigure(2, weight=4)
+    # Colunas que vão se esticar (o que sobra da linha)
+    linha_frame.grid_columnconfigure(0, weight=1)  # Código
+    linha_frame.grid_columnconfigure(2, weight=6)  # Descrição
+    linha_frame.grid_columnconfigure(3, weight=1)  # Data reajuste
+    linha_frame.grid_columnconfigure(4, weight=1)  # Valor
+    linha_frame.grid_columnconfigure(5, weight=1)  # Reajuste
 
-    e_cod = customtkinter.CTkEntry(linha_frame, placeholder_text="Código", width=120)
-    e_cod.grid(row=0, column=0, padx=2)
+    # Colunas FIXAS (sem weight)
+    linha_frame.grid_columnconfigure(1, weight=0)  # Botão pesquisar
+    linha_frame.grid_columnconfigure(6, weight=0)  # Botão -
+
+    e_cod = customtkinter.CTkEntry(linha_frame, placeholder_text="Código")
+    e_cod.grid(row=0, column=0, padx=2, sticky="ew")
 
     btn_pesquisar = customtkinter.CTkButton(
         linha_frame,
         text="Pesquisar",
-        width=90,
+        width=120,  # FIXO
         fg_color="green",
         hover_color="darkgreen",
         command=lambda: info_produto(e_cod.get(), e_desc, entry_id.get())
@@ -215,21 +239,24 @@ def adicionar_linha():
     e_desc = customtkinter.CTkEntry(linha_frame, placeholder_text="Descrição")
     e_desc.grid(row=0, column=2, padx=2, sticky="ew")
 
-    e_val = customtkinter.CTkEntry(linha_frame, placeholder_text="Valor", width=100)
-    e_val.grid(row=0, column=3, padx=2)
+    l_reajuste = customtkinter.CTkLabel(linha_frame, text="", fg_color="transparent")
+    l_reajuste.grid(row=0, column=3, padx=2, sticky="ew")
 
-    e_reaj = customtkinter.CTkEntry(linha_frame, placeholder_text="Reajuste", width=100)
-    e_reaj.grid(row=0, column=4, padx=2)
+    e_val = customtkinter.CTkEntry(linha_frame, placeholder_text="Valor")
+    e_val.grid(row=0, column=4, padx=2, sticky="ew")
+
+    e_reaj = customtkinter.CTkEntry(linha_frame, placeholder_text="Reajuste")
+    e_reaj.grid(row=0, column=5, padx=2, sticky="ew")
 
     btn_menos = customtkinter.CTkButton(
         linha_frame,
         text="-",
-        width=35,
+        width=80,  # FIXO
         fg_color="#922b21",
         hover_color="#641e16",
         command=lambda: linha_frame.destroy()
     )
-    btn_menos.grid(row=0, column=5, padx=5)
+    btn_menos.grid(row=0, column=6, padx=2)
 
     linhas_produtos.append({
         "codigo": e_cod,
@@ -238,11 +265,13 @@ def adicionar_linha():
         "reajuste": e_reaj
     })
 
+
+
 def gerar_pdf():
     nome = entry_nome.get()
     identidade = entry_id.get()
     data_hoje = datetime.now().strftime("%d/%m/%Y")
-    caminho_pdf = os.path.join(BASE_DIR, f"Relatorio_{identidade}.pdf")
+    caminho_pdf = os.path.join(APP_DIR, f"Relatorio_{identidade}.pdf")
     doc = SimpleDocTemplate(caminho_pdf, pagesize=A4)
     styles = getSampleStyleSheet()
     elementos = []
@@ -252,21 +281,26 @@ def gerar_pdf():
     elementos.append(Paragraph(f"<b>Data:</b> {data_hoje}", styles['Normal']))
     elementos.append(Spacer(1, 10))
 
-    dados = [["Código", "Descrição", "Valor", "Reajuste"]]
+    dados = [["Código", "Descrição", "Último Reajuste", "Valor", "Reajuste"]]
+
     for frame in frame_produtos.winfo_children():
         widgets = frame.winfo_children()
-        codigo = widgets[0].get()
-        descricao = Paragraph(widgets[2].get(), styles['Normal'])
-        valor = widgets[3].get()
-        reajuste = widgets[4].get()
-        dados.append([codigo, descricao, valor, reajuste])
 
-    tabela = Table(dados, colWidths=[30*mm, 80*mm, 35*mm, 35*mm])
+        codigo = widgets[0].get()                 # Entry Código
+        descricao = Paragraph(widgets[2].get(), styles['Normal'])  # Entry Descrição
+        ultimo = Paragraph(widgets[3].cget("text"))
+        valor = widgets[4].get()                  # Entry Valor
+        reajuste = widgets[5].get()               # Entry Reajuste
+
+        dados.append([codigo, descricao, ultimo, valor, reajuste])
+
+    tabela = Table(dados, colWidths=[25*mm, 65*mm, 35*mm, 25*mm, 25*mm])
     tabela.setStyle(TableStyle([
         ('GRID', (0,0), (-1,-1), 1, colors.black),
         ('BACKGROUND', (0,0), (-1,0), colors.grey),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
     ]))
+
     elementos.append(tabela)
     doc.build(elementos)
     os.startfile(caminho_pdf)
