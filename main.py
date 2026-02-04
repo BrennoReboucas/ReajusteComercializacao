@@ -292,7 +292,7 @@ def make_circle(image_path, size):
 
 # ================== JANELA ==================
 
-customtkinter.set_appearance_mode("light")
+customtkinter.set_appearance_mode("dark")
 app = customtkinter.CTk()
 app.title("Reajuste Comercialização")
 app.after(0, lambda: app.state('zoomed'))
