@@ -1,4 +1,5 @@
 import customtkinter, os, requests, threading, json, sys, subprocess
+from tkinter import messagebox
 import auth.token_api as token_api
 from PIL import Image, ImageOps, ImageDraw
 from io import BytesIO
@@ -118,12 +119,20 @@ def atualizar_artesao(nome, foto_url):
             print("Erro ao carregar foto:", e)
 
 # ================== PRODUTO ==================
+def erro():
+        messagebox.showerror(
+        title="Erro",
+        message="Você não pode gerar o PDF sem ter cadastrado produtos."
+    )
 
 def info_produto(codigo, e_desc, id):
     token_api.capturar_token()
     token = token_api.carregar_token()
     header = {"Authorization": token}
     url = link["comercializacaoProduto"]
+
+    if not id:
+        id = "-"
 
     if radio_tipo_var.get() == "Artesao":
         payload = {
@@ -194,7 +203,7 @@ def info_reajuste(id):
 
 def atualizar_entry(data, e_desc):
     descricao = data['response'][0]['produto']['nome']
-    valor = data['response'][0]['valorVarejo']
+    valor = data['response'][0]['valorCompra']
     reajuste = round(valor * 1.10, 2)
 
     e_desc.delete(0, "end")
@@ -203,6 +212,30 @@ def atualizar_entry(data, e_desc):
     e_val.insert(0, f"R$ {valor}")
     e_reaj.delete(0, "end")
     e_reaj.insert(0, f"R$ {reajuste}")
+
+def limpar():
+    img = Image.open("foto.png").convert("RGBA")
+    img = ImageOps.fit(img, (80, 80), Image.LANCZOS)
+
+    mask = Image.new("L", (80, 80), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((0, 0, 80, 80), fill=255)
+    img.putalpha(mask)
+
+    img_padrao = customtkinter.CTkImage(
+        light_image=img,
+        dark_image=img,
+        size=(80, 80)
+    )
+
+    label_foto.configure(image=img_padrao)
+    label_foto.image = img_padrao
+    entry_id.delete(0, "end")
+    entry_nome.delete(0, "end")
+    e_cod.delete(0, "end")
+    e_desc.delete(0, "end")
+    e_val.delete(0, "end")
+    e_reaj.delete(0, "end")
 
 # ================== UI LINHA PRODUTO ==================
 
@@ -251,26 +284,44 @@ def adicionar_linha():
     btn_menos = customtkinter.CTkButton(
         linha_frame,
         text="-",
-        width=80,  # FIXO
-        fg_color="#922b21",
-        hover_color="#641e16",
-        command=lambda: linha_frame.destroy()
+        fg_color="#FF0000",
+        hover_color="#A70606",
+        command=lambda: remover_linha(linha_data)
     )
     btn_menos.grid(row=0, column=6, padx=2)
 
-    linhas_produtos.append({
+    linha_data = {
         "codigo": e_cod,
         "descricao": e_desc,
         "valor": e_val,
-        "reajuste": e_reaj
-    })
+        "reajuste": e_reaj,
+        "frame": linha_frame
+    }
 
+    linhas_produtos.append(linha_data)
+
+def remover_linha(linha):
+    if linha in linhas_produtos:
+        linhas_produtos.remove(linha)
+    linha["frame"].destroy()
 
 
 def gerar_pdf():
+    if not linhas_produtos:
+        erro()
+        return
+
+    # 🔍 Validação
+    for linha in linhas_produtos:
+        if linha["descricao"].get().strip() == "":
+            erro()
+            return
+
+    # 📄 Geração do PDF
     nome = entry_nome.get()
     identidade = entry_id.get()
     data_hoje = datetime.now().strftime("%d/%m/%Y")
+
     caminho_pdf = os.path.join(APP_DIR, f"Relatorio_{identidade}.pdf")
     doc = SimpleDocTemplate(caminho_pdf, pagesize=A4)
     styles = getSampleStyleSheet()
@@ -286,11 +337,11 @@ def gerar_pdf():
     for frame in frame_produtos.winfo_children():
         widgets = frame.winfo_children()
 
-        codigo = widgets[0].get()                 # Entry Código
-        descricao = Paragraph(widgets[2].get(), styles['Normal'])  # Entry Descrição
-        ultimo = Paragraph(widgets[3].cget("text"))
-        valor = widgets[4].get()                  # Entry Valor
-        reajuste = widgets[5].get()               # Entry Reajuste
+        codigo = widgets[0].get()
+        descricao = Paragraph(widgets[2].get(), styles['Normal'])
+        ultimo = Paragraph(widgets[3].cget("text"), styles['Normal'])
+        valor = widgets[4].get()
+        reajuste = widgets[5].get()
 
         dados.append([codigo, descricao, ultimo, valor, reajuste])
 
@@ -386,6 +437,15 @@ customtkinter.CTkButton(
     height=40,
     command=gerar_pdf
 ).pack(pady=10)
+
+customtkinter.CTkButton(
+    app,
+    text="x Limpar ",
+    fg_color="#FF0000",
+    hover_color="#A70606",
+    height=40,
+    command=limpar
+).pack(pady=30)
 
 
 adicionar_linha()
