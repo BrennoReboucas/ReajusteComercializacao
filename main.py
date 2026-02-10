@@ -322,7 +322,7 @@ def gerar_pdf():
     identidade = entry_id.get()
     data_hoje = datetime.now().strftime("%d/%m/%Y")
 
-    caminho_pdf = os.path.join(APP_DIR, f"Relatorio_{identidade}.pdf")
+    caminho_pdf = os.path.join(APP_DIR, f"Reajuste_{nome}_{identidade}.pdf")
     doc = SimpleDocTemplate(caminho_pdf, pagesize=A4)
     styles = getSampleStyleSheet()
     elementos = []
