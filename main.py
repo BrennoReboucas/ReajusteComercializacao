@@ -44,6 +44,7 @@ def info_artesao_thread(id):
     threading.Thread(target=info_artesao, args=(id,), daemon=True).start()
 
 def info_artesao(id):
+    global cidade
     token_api.capturar_token()
     token = token_api.carregar_token()
     header = {"Authorization": token}
@@ -66,6 +67,7 @@ def info_artesao(id):
     data = response.json()
 
     nome = data['response'][0]['nome']
+    cidade = data['response'][0]['municipio']['nome']
     foto = "http://apiceart.sps.ce.gov.br:8894/ceart-artesao/artesao/imagens/" + data['response'][0]['foto']
 
     app.after(0, lambda: atualizar_artesao(nome, foto))
@@ -73,6 +75,7 @@ def info_artesao(id):
 
 
 def info_entidade(id):
+    global cidade
     token_api.capturar_token()
     token = token_api.carregar_token()
     header = {"Authorization": token}
@@ -93,6 +96,7 @@ def info_entidade(id):
     response = requests.post(url=url, json=payload, headers=header)
     data = response.json()
     nome = data['response'][0]['nome']
+    cidade = data['response'][0]['municipio']['nome']
     atualizar_artesao(nome, None)
 
 
@@ -209,9 +213,9 @@ def atualizar_entry(data, e_desc):
     e_desc.delete(0, "end")
     e_desc.insert(0, descricao)
     e_val.delete(0, "end")
-    e_val.insert(0, f"R$ {valor}")
+    e_val.insert(0, f"R$ {valor:.2f}")
     e_reaj.delete(0, "end")
-    e_reaj.insert(0, f"R$ {reajuste}")
+    e_reaj.insert(0, f"R$ {reajuste:.2f}")
 
 def limpar():
     img = Image.open("foto.png").convert("RGBA")
@@ -329,6 +333,7 @@ def gerar_pdf():
 
     elementos.append(Paragraph(f"<b>Artesão/Entidade:</b> {nome}", styles['Normal']))
     elementos.append(Paragraph(f"<b>Identidade:</b> {identidade}", styles['Normal']))
+    elementos.append(Paragraph(f"<b>Cidade:</b> {cidade}, Ceará", styles['Normal']))
     elementos.append(Paragraph(f"<b>Data:</b> {data_hoje}", styles['Normal']))
     elementos.append(Spacer(1, 10))
 
